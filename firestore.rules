@@ -1,0 +1,41 @@
+rules_version = '2';
+service cloud.firestore {
+ match /databases/{database}/documents {
+  function signedIn() { return request.auth != null; }
+  function validSubmission() {
+   let d=request.resource.data;
+   return d.keys().hasOnly(['productNo','name','price','regularPrice','store','clientCreatedAt','createdAt','status','source','imageHash','ocrText','reporter','notes'])
+    && d.keys().hasAll(['productNo','name','price','store','createdAt','status','source','reporter'])
+    && d.productNo is string && d.productNo.matches('^[0-9]{5,9}$')
+    && d.name is string && d.name.size()>=2 && d.name.size()<=150
+    && d.price is int && d.price>=100 && d.price<=10000000
+    && (d.get('regularPrice',null) == null || (d.regularPrice is int && d.regularPrice>=d.price && d.regularPrice<=10000000))
+    && d.store is string && d.store in ['세종점','대전점','양재점','상봉점','광명점','송도점','하남점','일산점','부산점','대구점','기타']
+    && d.createdAt==request.time && d.status=='pending' && d.source=='user'
+    && d.reporter==request.auth.uid
+    && d.imageHash is string && d.imageHash.size()<=64
+    && d.ocrText is string && d.ocrText.size()<=2000
+    && d.notes is string && d.notes.size()<=1000
+    && d.clientCreatedAt is string && d.clientCreatedAt.size()<=40;
+  }
+  match /price_submissions/{id} {
+   allow create: if signedIn() && validSubmission();
+   allow read,update,delete: if false;
+  }
+  match /barcode_links/{id} {
+   allow create: if signedIn()
+    && request.resource.data.keys().hasOnly(['barcode','productName','status','reporter','createdAt'])
+    && request.resource.data.barcode is string && request.resource.data.barcode.matches('^[0-9]{8,14}$')
+    && request.resource.data.productName is string && request.resource.data.productName.size()>=2 && request.resource.data.productName.size()<=100
+    && request.resource.data.status=='pending'
+    && request.resource.data.reporter==request.auth.uid
+    && request.resource.data.createdAt==request.time;
+   allow read,update,delete: if false;
+  }
+  match /verified_prices/{id} {
+   allow read: if true;
+   allow write: if false;
+  }
+  match /{document=**} { allow read,write: if false; }
+ }
+}

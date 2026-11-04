@@ -1,0 +1,13 @@
+import { initializeApp, type FirebaseApp } from 'firebase/app';
+import { getAuth, signInAnonymously, onAuthStateChanged, type Auth } from 'firebase/auth';
+import {getFirestore, collection, addDoc, getDocs, limit, orderBy, query, serverTimestamp, type Firestore} from 'firebase/firestore';
+import type {PriceRecord} from './types';
+const config={apiKey:import.meta.env.VITE_FIREBASE_API_KEY,authDomain:import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,projectId:import.meta.env.VITE_FIREBASE_PROJECT_ID,appId:import.meta.env.VITE_FIREBASE_APP_ID};
+export const firebaseEnabled=Boolean(config.apiKey&&config.projectId&&config.appId);
+let app:FirebaseApp|undefined;let auth:Auth|undefined;let db:Firestore|undefined;
+if(firebaseEnabled){app=initializeApp(config);auth=getAuth(app);db=getFirestore(app);}
+export async function anonymousUser():Promise<string>{if(!auth)throw Error('Firebase가 설정되지 않았습니다.');const current=auth.currentUser;if(current)return current.uid;await new Promise<void>((resolve,reject)=>{const unsubscribe=onAuthStateChanged(auth,()=>{unsubscribe();resolve();},reject);});if(auth.currentUser)return (auth.currentUser as {uid:string}).uid;return (await signInAnonymously(auth)).user.uid;}
+export async function submitFirebase(record:PriceRecord){if(!db)throw Error('Firebase 설정 없음');const uid=await anonymousUser();await addDoc(collection(db,'price_submissions'),{productNo:record.productNo,name:record.name,price:record.price,regularPrice:record.regularPrice,store:record.store,clientCreatedAt:record.createdAt,createdAt:serverTimestamp(),status:'pending',source:'user',imageHash:record.imageHash||'',ocrText:(record.ocrText||'').slice(0,2000),reporter:uid,notes:record.notes||''});}
+export async function loadVerified():Promise<PriceRecord[]>{if(!db)return [];const snap=await getDocs(query(collection(db,'verified_prices'),orderBy('createdAt','desc'),limit(100)));return snap.docs.map(d=>{const x=d.data();return {id:d.id,productNo:String(x.productNo||''),name:String(x.name||''),price:Number(x.price),regularPrice:x.regularPrice==null?null:Number(x.regularPrice),store:String(x.store||''),createdAt:x.createdAt?.toDate?.()?.toISOString?.()||new Date().toISOString(),status:'verified' as const,source:'user' as const};});}
+export async function submitBarcodeLink(barcode:string,productName:string){if(!db)return;const uid=await anonymousUser();await addDoc(collection(db,'barcode_links'),{barcode,productName,status:'pending',reporter:uid,createdAt:serverTimestamp()});}
+export async function fetchOnlineLowest(query:string):Promise<{lowestPrice:number|null;mallName?:string;title?:string}|null>{try{const r=await fetch('/api/naver-price?query='+encodeURIComponent(query));if(!r.ok)return null;return await r.json();}catch{return null;}}
