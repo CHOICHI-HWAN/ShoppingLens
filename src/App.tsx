@@ -12,7 +12,7 @@ const VERDICT:Record<Verdict,string>={store:'매장 구매 추천',online:'온�
 
 export default function App(){
  const video=useRef<HTMLVideoElement>(null);const sheetOpen=useRef(false);
- const [barcode,setBarcode]=useState<string|null>(null);const [camError,setCamError]=useState('');
+ const [barcode,setBarcode]=useState<string|null>(null);const [camError,setCamError]=useState('');const [camReady,setCamReady]=useState(false);
  const [mart,setMart]=useState<MartData|null>(null);const [coffee,setCoffee]=useState(false);const [report,setReport]=useState(false);
  useEffect(()=>{loadMart().then(setMart).catch(()=>setMart(null));},[]);
  useEffect(()=>{sheetOpen.current=barcode!==null;},[barcode]);
@@ -23,7 +23,7 @@ export default function App(){
    try{
     stream=await navigator.mediaDevices.getUserMedia({video:{facingMode:{ideal:'environment'},width:{ideal:1280}},audio:false});
     if(stop){stream.getTracks().forEach(t=>t.stop());return;}
-    const v=video.current!;v.srcObject=stream;await v.play();
+    const v=video.current!;v.srcObject=stream;await v.play();setCamReady(true);
     const det=new BarcodeDetector({formats:[...FORMATS]});let last=0;
     const loop=async()=>{
      if(stop)return;
@@ -37,7 +37,8 @@ export default function App(){
  if(report)return <div className="report-wrap"><button className="back" onClick={()=>setReport(false)}>← 스캔으로</button><Suspense fallback={<p className="micro">불러오는 중…</p>}><Report/></Suspense></div>;
  return <div className="scanner">
   <video ref={video} playsInline muted autoPlay/>
-  {!barcode&&!camError&&<div className="aim" aria-hidden="true"/>}
+  {!barcode&&camReady&&<div className="aim" aria-hidden="true"/>}
+  {!camReady&&!camError&&<div className="cam-wait">카메라 준비 중… 권한 요청이 뜨면 허용해 주세요.</div>}
   <button className="coffee" aria-label="후원" onClick={()=>setCoffee(true)}>☕</button>
   {camError&&<div className="cam-error"><p>카메라 권한이 필요합니다.</p><small>{camError}</small><button onClick={()=>location.reload()}>다시 시도</button><ManualEntry onCode={onScan}/></div>}
   {barcode&&<Sheet barcode={barcode} mart={mart} onClose={()=>setBarcode(null)} onReport={()=>{setBarcode(null);setReport(true);}}/>}
