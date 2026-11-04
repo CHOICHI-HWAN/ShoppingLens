@@ -13,9 +13,9 @@ const VERDICT:Record<Verdict,string>={store:'매장 구매 추천',online:'온�
 export default function App(){
  const video=useRef<HTMLVideoElement>(null);const sheetOpen=useRef(false);
  const [barcode,setBarcode]=useState<string|null>(null);const [camError,setCamError]=useState('');const [camReady,setCamReady]=useState(false);
- const [mart,setMart]=useState<MartData|null>(null);const [coffee,setCoffee]=useState(false);const [report,setReport]=useState(false);
+ const [mart,setMart]=useState<MartData|null>(null);const [search,setSearch]=useState(false);const [coffee,setCoffee]=useState(false);const [report,setReport]=useState(false);
  useEffect(()=>{loadMart().then(setMart).catch(()=>setMart(null));},[]);
- useEffect(()=>{sheetOpen.current=barcode!==null;},[barcode]);
+ useEffect(()=>{sheetOpen.current=barcode!==null||search;},[barcode,search]);
  const onScan=useCallback((code:string)=>{navigator.vibrate?.(50);setBarcode(code);},[]);
  useEffect(()=>{
   let stop=false;let stream:MediaStream|undefined;let raf=0;
@@ -43,13 +43,19 @@ export default function App(){
  if(report)return <div className="report-wrap"><button className="back" onClick={()=>setReport(false)}>← 스캔으로</button><Suspense fallback={<p className="micro">불러오는 중…</p>}><Report/></Suspense></div>;
  return <div className="scanner">
   <video ref={video} playsInline muted autoPlay/>
-  {!barcode&&camReady&&<div className="aim" aria-hidden="true"/>}
+  {!barcode&&!search&&camReady&&<div className="aim" aria-hidden="true"/>}
   {!camReady&&!camError&&<div className="cam-wait">카메라 준비 중… 권한 요청이 뜨면 허용해 주세요.</div>}
   <button className="coffee" aria-label="후원" onClick={()=>setCoffee(true)}>☕</button>
   {camError&&<div className="cam-error"><p>카메라 권한이 필요합니다.</p><small>{camError}</small><button onClick={()=>location.reload()}>다시 시도</button><ManualEntry onCode={onScan}/></div>}
-  {barcode&&<Sheet barcode={barcode} mart={mart} onClose={()=>setBarcode(null)} onReport={()=>{setBarcode(null);setReport(true);}}/>}
+  {!barcode&&!search&&<SearchHandle onOpen={()=>setSearch(true)}/>}
+  {(barcode||search)&&<Sheet barcode={barcode} mart={mart} onClose={()=>{setBarcode(null);setSearch(false);}} onReport={()=>{setBarcode(null);setSearch(false);setReport(true);}}/>}
   {coffee&&<div className="modal" onClick={()=>setCoffee(false)}><div className="modal-card" onClick={e=>e.stopPropagation()}><h2>서버비 후원</h2><p>광고와 제휴 링크 없이 운영합니다. 자발적 후원만 받습니다.</p><p className="micro">후원 링크는 배포 시 설정하세요(토스 / Buy Me a Coffee).</p><button onClick={()=>setCoffee(false)}>닫기</button></div></div>}
  </div>;
+}
+
+function SearchHandle({onOpen}:{onOpen:()=>void}){
+ const y=useRef(0);
+ return <button className="handle" aria-label="상품 검색" onClick={onOpen} onTouchStart={e=>{y.current=e.touches[0].clientY;}} onTouchEnd={e=>{if(y.current-e.changedTouches[0].clientY>24)onOpen();}}><span/></button>;
 }
 
 function ManualEntry({onCode}:{onCode:(c:string)=>void}){
@@ -57,8 +63,8 @@ function ManualEntry({onCode}:{onCode:(c:string)=>void}){
  return <form onSubmit={e=>{e.preventDefault();if(/^\d{8,14}$/.test(v))onCode(v);}}><input inputMode="numeric" value={v} onChange={e=>setV(e.target.value.replace(/\D/g,''))} placeholder="바코드 직접 입력"/><button>조회</button></form>;
 }
 
-function Sheet({barcode,mart,onClose,onReport}:{barcode:string;mart:MartData|null;onClose:()=>void;onReport:()=>void}){
- const [linked,setLinked]=useState<string|undefined>(()=>getLinks()[barcode]);
+function Sheet({barcode,mart,onClose,onReport}:{barcode:string|null;mart:MartData|null;onClose:()=>void;onReport:()=>void}){
+ const [linked,setLinked]=useState<string|undefined>(()=>barcode?getLinks()[barcode]:undefined);
  const [q,setQ]=useState('');const [storePrice,setStorePrice]=useState('');
  const [online,setOnline]=useState<{price:number|null;mall?:string;title?:string}|'loading'|null>(null);
  const product:MartProduct|undefined=mart?.products.find(p=>p.name===linked);
@@ -73,11 +79,11 @@ function Sheet({barcode,mart,onClose,onReport}:{barcode:string;mart:MartData|nul
  const sp=storePrice?Number(storePrice):null;
  const onlinePrice=online&&online!=='loading'?online.price:null;
  const verdict=judge(sp,onlinePrice,m?.price??null);
- function pick(p:MartProduct){setLinked(p.name);saveLink(barcode,p.name);if(firebaseEnabled)submitBarcodeLink(barcode,p.name).catch(()=>{});}
+ function pick(p:MartProduct){setLinked(p.name);if(!barcode)return;saveLink(barcode,p.name);if(firebaseEnabled)submitBarcodeLink(barcode,p.name).catch(()=>{});}
  return <div className="sheet" role="dialog" aria-label="가격 비교">
-  <div className="grab"/><div className="sheet-head"><code>{barcode}</code><button aria-label="닫기" onClick={onClose}>×</button></div>
+  <div className="grab"/><div className="sheet-head"><code>{barcode??'상품 검색'}</code><button aria-label="닫기" onClick={onClose}>×</button></div>
   {!mart&&<div className="shimmer"/>}
-  {mart&&!product&&<div><p className="hint">이 바코드와 연결된 상품이 없습니다. 상품을 검색해 연결하세요.</p>
+  {mart&&!product&&<div><p className="hint">{barcode?'이 바코드와 연결된 상품이 없습니다. 상품을 검색해 연결하세요.':'상품명으로 검색해 시세를 확인하세요.'}</p>
    <input autoFocus value={q} onChange={e=>setQ(e.target.value)} placeholder="상품명 검색 (예: 신라면)"/>
    <ul className="results">{results.map(p=><li key={p.name}><button onClick={()=>pick(p)}>{p.name}</button></li>)}</ul>
    {q&&!results.length&&<p className="hint">참가격 조사 상품(약 {mart.products.length}종)에 없습니다.</p>}</div>}

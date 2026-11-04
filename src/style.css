@@ -33,3 +33,6 @@
 .sheet{touch-action:pan-y;padding-bottom:calc(96px + env(safe-area-inset-bottom));max-height:75vh;max-height:75dvh}
 .cam-error{touch-action:pan-y;padding-bottom:calc(120px + env(safe-area-inset-bottom))}
 .report-wrap{min-height:100vh;min-height:100dvh;overflow-y:auto;-webkit-overflow-scrolling:touch;touch-action:pan-y}
+
+.handle{position:absolute;left:50%;bottom:calc(88px + env(safe-area-inset-bottom));transform:translateX(-50%);width:120px;height:44px;border:0;background:none;display:flex;align-items:center;justify-content:center;touch-action:none}
+.handle span{width:44px;height:5px;border-radius:3px;background:rgba(255,255,255,.55)}
