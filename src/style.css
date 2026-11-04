@@ -26,3 +26,10 @@
 .modal{position:absolute;inset:0;background:rgba(0,0,0,.6);display:flex;align-items:center;justify-content:center;padding:24px}
 .modal-card{background:#fff;color:#172b29;border-radius:16px;padding:20px;max-width:340px}
 .report-wrap .back{margin:10px;padding:8px 12px;border:1px solid #cfd8d6;border-radius:10px;background:#fff}
+
+/* iOS Safari: 하단 툴바에 가려지거나 스크롤이 막히는 문제 보정 */
+.scanner{inset:0 0 auto 0;height:100vh;height:100dvh;touch-action:none}
+.scanner video{pointer-events:none}
+.sheet{touch-action:pan-y;padding-bottom:calc(96px + env(safe-area-inset-bottom));max-height:75vh;max-height:75dvh}
+.cam-error{touch-action:pan-y;padding-bottom:calc(120px + env(safe-area-inset-bottom))}
+.report-wrap{min-height:100vh;min-height:100dvh;overflow-y:auto;-webkit-overflow-scrolling:touch;touch-action:pan-y}
