@@ -23,7 +23,13 @@ export default function App(){
    try{
     stream=await navigator.mediaDevices.getUserMedia({video:{facingMode:{ideal:'environment'},width:{ideal:1280}},audio:false});
     if(stop){stream.getTracks().forEach(t=>t.stop());return;}
-    const v=video.current!;v.srcObject=stream;await v.play();setCamReady(true);
+    const v=video.current!;v.srcObject=stream;await v.play();
+    // 권한은 통과했지만 영상이 오지 않는 경우(앱 내장 브라우저 등)를 감지합니다.
+    const track=stream.getVideoTracks()[0];
+    await new Promise(r=>setTimeout(r,1500));
+    if(stop)return;
+    if(!track||track.readyState!=='live'||track.muted||!v.videoWidth){setCamError('카메라 영상이 수신되지 않습니다. Safari/Chrome 등 기본 브라우저에서 이 주소를 열어 보세요.');return;}
+    setCamReady(true);
     const det=new BarcodeDetector({formats:[...FORMATS]});let last=0;
     const loop=async()=>{
      if(stop)return;
